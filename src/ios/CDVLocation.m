@@ -32,7 +32,7 @@
 
 @implementation CDVLocationData
 
-@synthesize locationStatus, locationInfo, locationCallbacks, watchCallbacks;
+@synthesize locationStatus, locationInfo, locationCallbacks, watchCallbacks, distanceFilter;
 - (CDVLocationData*)init
 {
     self = (CDVLocationData*)[super init];
@@ -40,6 +40,7 @@
         self.locationInfo = nil;
         self.locationCallbacks = nil;
         self.watchCallbacks = nil;
+        self.distanceFilter = 5;
     }
     return self;
 }
@@ -60,7 +61,29 @@
     __locationStarted = NO;
     __highAccuracyEnabled = NO;
     self.locationData = nil;
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onSuspend:) name:UIApplicationDidEnterBackgroundNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onResume:) name:UIApplicationWillEnterForegroundNotification object:nil];
+
 }
+
+/**
+ * Suspend.  Turn on passive location services
+ */
+-(void) onSuspend:(NSNotification *) notification
+{
+  [self _stopLocation];
+}
+/**@
+ * Resume.  Turn background off
+ */
+-(void) onResume:(NSNotification *) notification
+{
+  if([self.locationData.watchCallbacks count] > 0) {
+    [self startLocation:true];
+  }
+}
+
 
 - (BOOL)isAuthorized
 {
@@ -132,7 +155,7 @@
         return;
     }
 #endif
-    
+
     // Tell the location manager to start notifying us of location updates. We
     // first stop, and then start the updating to ensure we get at least one
     // update, even if our location did not change.
@@ -140,17 +163,12 @@
     [self.locationManager startUpdatingLocation];
     __locationStarted = YES;
     if (enableHighAccuracy) {
-        __highAccuracyEnabled = YES;
-        // Set distance filter to 5 for a high accuracy. Setting it to "kCLDistanceFilterNone" could provide a
-        // higher accuracy, but it's also just spamming the callback with useless reports which drain the battery.
-        self.locationManager.distanceFilter = 5;
-        // Set desired accuracy to Best.
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest;
-    } else {
-        __highAccuracyEnabled = NO;
-        // TODO: Set distance filter to 10 meters? and desired accuracy to nearest ten meters? arbitrary.
-        self.locationManager.distanceFilter = 10;
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters;
+      __highAccuracyEnabled = YES;
+      // Set distance filter to 5 for a high accuracy. Setting it to "kCLDistanceFilterNone" could provide a
+      // higher accuracy, but it's also just spamming the callback with useless reports which drain the battery.
+      CDVLocationData* lData = self.locationData;
+      self.locationManager.distanceFilter = lData.distanceFilter;
+      self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters;
     }
 }
 
@@ -160,7 +178,7 @@
         if (![self isLocationServicesEnabled]) {
             return;
         }
-
+        NSLog(@"Stopped location watching");
         [self.locationManager stopUpdatingLocation];
         __locationStarted = NO;
         __highAccuracyEnabled = NO;
@@ -217,7 +235,7 @@
                 [lData.locationCallbacks addObject:callbackId];
             }
             // Tell the location manager to start notifying us of heading updates
-            [self startLocation:enableHighAccuracy];
+            [self startLocation:true];
         } else {
             [self returnLocationInfo:callbackId andKeepCallback:NO];
         }
@@ -228,7 +246,7 @@
 {
     NSString* callbackId = command.callbackId;
     NSString* timerId = [command argumentAtIndex:0];
-    BOOL enableHighAccuracy = [[command argumentAtIndex:1] boolValue];
+    NSInteger distanceFilter = [[command argumentAtIndex:1] integerValue];
 
     if (!self.locationData) {
         self.locationData = [[CDVLocationData alloc] init];
@@ -241,6 +259,10 @@
 
     // add the callbackId into the dictionary so we can call back whenever get data
     [lData.watchCallbacks setObject:callbackId forKey:timerId];
+    if (lData.distanceFilter < distanceFilter){
+      lData.distanceFilter = distanceFilter;
+    }
+
 
     if ([self isLocationServicesEnabled] == NO) {
         NSMutableDictionary* posError = [NSMutableDictionary dictionaryWithCapacity:2];
@@ -249,9 +271,9 @@
         CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:posError];
         [self.commandDelegate sendPluginResult:result callbackId:callbackId];
     } else {
-        if (!__locationStarted || (__highAccuracyEnabled != enableHighAccuracy)) {
+        if (!__locationStarted) {
             // Tell the location manager to start notifying us of location updates
-            [self startLocation:enableHighAccuracy];
+            [self startLocation:true];
         }
     }
 }
@@ -270,6 +292,7 @@
 
 - (void)stopLocation:(CDVInvokedUrlCommand*)command
 {
+
     [self _stopLocation];
 }
 
@@ -348,7 +371,7 @@
 -(void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
 {
     if(!__locationStarted){
-        [self startLocation:__highAccuracyEnabled];
+        [self startLocation:true];
     }
 }
 

@@ -32,7 +32,8 @@ function parseParameters(options) {
     var opt = {
         maximumAge: 0,
         enableHighAccuracy: false,
-        timeout: Infinity
+        timeout: Infinity,
+        distanceFilter: 5
     };
 
     if (options) {
@@ -77,6 +78,8 @@ var geolocation = {
    * @param {PositionOptions} options     The options for getting the position data. (OPTIONAL)
    */
     getCurrentPosition:function(successCallback, errorCallback, options) {
+
+        console.log("GEOLOCATION CALLEDDDDDDD");
         argscheck.checkArgs('fFO', 'geolocation.getCurrentPosition', arguments);
         options = parseParameters(options);
 
@@ -190,7 +193,7 @@ var geolocation = {
             successCallback(pos);
         };
 
-        exec(win, fail, "Geolocation", "addWatch", [id, options.enableHighAccuracy]);
+        exec(win, fail, "Geolocation", "addWatch", [id, options.distanceFilter]);
 
         return id;
     },

@@ -34,12 +34,14 @@ typedef NSUInteger CDVLocationStatus;
     NSMutableArray* locationCallbacks;
     NSMutableDictionary* watchCallbacks;
     CLLocation* locationInfo;
+    NSInteger distanceFilter;
 }
 
 @property (nonatomic, assign) CDVLocationStatus locationStatus;
 @property (nonatomic, strong) CLLocation* locationInfo;
 @property (nonatomic, strong) NSMutableArray* locationCallbacks;
 @property (nonatomic, strong) NSMutableDictionary* watchCallbacks;
+@property (nonatomic, assign) NSInteger distanceFilter;
 
 @end
 
