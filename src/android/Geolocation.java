@@ -111,7 +111,7 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
     /**
      * Called when the system is about to start resuming a previous activity.
      *
-     * @param multitasking		Flag indicating if multitasking is turned on for app
+     * @param multitasking      Flag indicating if multitasking is turned on for app
      */
     @Override
     public void onPause(boolean multitasking) {
@@ -123,7 +123,7 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
     /**
      * Called when the activity will start interacting with the user.
      *
-     * @param multitasking		Flag indicating if multitasking is turned on for app
+     * @param multitasking      Flag indicating if multitasking is turned on for app
      */
     @Override
     public void onResume(boolean multitasking) {
@@ -179,16 +179,68 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
         Log.d(LOG_TAG, "Start location service");
         locationLooking = true;
 
-        locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                0,
-                distanceFilter,
-                _instance, Looper.getMainLooper());
-        currentLocation=locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        for (String s : locationManager.getAllProviders()) {
+            locationManager.requestLocationUpdates(
+                    s,//LocationManager.GPS_PROVIDER,
+                    0,
+                    distanceFilter,
+                    _instance, Looper.getMainLooper());
+        }
+        currentLocation = this.getBestLocation();//locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
         if (currentLocation!=null) {
             notify_loc();
         }
 
+    }
+    Location getLocationByProvider(String provider) {
+        Location location = null;
+        try {
+            if (locationManager.isProviderEnabled(provider)) {
+                location = locationManager.getLastKnownLocation(provider);
+            }
+        } catch (IllegalArgumentException e) {
+            Log.d(LOG_TAG, "Cannot acces Provider " + provider);
+        }
+        return location;
+    }
+
+    Location getBestLocation() {
+        Location gpslocation = getLocationByProvider(LocationManager.GPS_PROVIDER);
+        Location networkLocation =
+                getLocationByProvider(LocationManager.NETWORK_PROVIDER);
+        // if we have only one location available, the choice is easy
+        if (gpslocation == null) {
+            Log.d(LOG_TAG, "No GPS Location available.");
+            return networkLocation;
+        }
+        if (networkLocation == null) {
+            Log.d(LOG_TAG, "No Network Location available");
+            return gpslocation;
+        }
+        // a locationupdate is considered 'old' if its older than the configured
+        // update interval. this means, we didn't get a
+        // update from this provider since the last check
+        long old = System.currentTimeMillis() - 30000;
+        boolean gpsIsOld = (gpslocation.getTime() < old);
+        boolean networkIsOld = (networkLocation.getTime() < old);
+        // gps is current and available, gps is better than network
+        if (!gpsIsOld) {
+            Log.d(LOG_TAG, "Returning current GPS Location");
+            return gpslocation;
+        }
+        // gps is old, we can't trust it. use network location
+        if (!networkIsOld) {
+            Log.d(LOG_TAG, "GPS is old, Network is current, returning network");
+            return networkLocation;
+        }
+        // both are old return the newer of those two
+        if (gpslocation.getTime() > networkLocation.getTime()) {
+            Log.d(LOG_TAG, "Both are old, returning gps(newer)");
+            return gpslocation;
+        } else {
+            Log.d(LOG_TAG, "Both are old, returning network(newer)");
+            return networkLocation;
+        }
     }
 
     private void stopLocation(){
