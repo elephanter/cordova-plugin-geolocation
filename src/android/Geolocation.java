@@ -1,6 +1,9 @@
 package org.apache.cordova;
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -40,10 +43,15 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
     private static Map<String, WatchedCallback> watchCallbacks = new HashMap();
     private static LocationManager locationManager;
     private static CordovaInterface _cordova;
+    private static Activity _cordovaActivity;
     private static Geolocation _instance;
+    String [] permissions = { Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION };
+
+    CallbackContext context;
 
     @Override
     public boolean execute(String action, CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
+        context = callbackContext;
         Log.d(LOG_TAG, "Got command: " + action);
         if (action.equals("getLocation")) {
             final Integer distanceFilter = args.getInt(1);
@@ -91,6 +99,16 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
             PluginResult p = new PluginResult(PluginResult.Status.OK);
             callbackContext.sendPluginResult(p);
         }
+        else if(action.equals("getPermission")){
+            if(hasPermisssion())
+            {
+                PluginResult r = new PluginResult(PluginResult.Status.OK);
+                context.sendPluginResult(r);
+            }
+            else {
+                PermissionHelper.requestPermissions(this, 0, permissions);
+            }
+        }
         else {
             return false;
         }
@@ -101,6 +119,9 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         Log.d(LOG_TAG, "Initialize location plugin");
+
+        _cordovaActivity = cordova.getActivity();
+
         locationLooking = false;
         locationManager = (LocationManager)
                 cordova.getActivity().getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
@@ -298,4 +319,45 @@ public class Geolocation extends  CordovaPlugin implements LocationListener {
             }
         });
     }
+
+
+    public void onRequestPermissionResult(int requestCode, String[] permissions,
+                                          int[] grantResults) throws JSONException
+    {
+        PluginResult result;
+        //This is important if we're using Cordova without using Cordova, but we have the geolocation plugin installed
+        if(context != null) {
+            for (int r : grantResults) {
+                if (r == PackageManager.PERMISSION_DENIED) {
+                    LOG.d(LOG_TAG, "Permission Denied!");
+                    result = new PluginResult(PluginResult.Status.ILLEGAL_ACCESS_EXCEPTION);
+                    context.sendPluginResult(result);
+                    return;
+                }
+
+            }
+            result = new PluginResult(PluginResult.Status.OK);
+            context.sendPluginResult(result);
+        }
+    }
+    public boolean hasPermisssion() {
+        for(String p : permissions)
+        {
+            if(!PermissionHelper.hasPermission(this, p))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+        /*
+     * We override this so that we can access the permissions variable, which no longer exists in
+     * the parent class, since we can't initialize it reliably in the constructor!
+     */
+    public void requestPermissions(int requestCode)
+    {
+        PermissionHelper.requestPermissions(this, requestCode, permissions);
+    }
+
 }

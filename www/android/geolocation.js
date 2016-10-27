@@ -140,7 +140,14 @@ var geolocation = {
                 // always truthy before we call into native
                 timeoutTimer.timer = true;
             }
-            exec(win, fail, "Geolocation", "getLocation", [options.enableHighAccuracy, options.maximumAge]);
+            
+            var wina = function(){
+            	exec(win, fail, "Geolocation", "getLocation", [options.enableHighAccuracy, options.maximumAge]);	
+            }
+            var faila = function(){
+            	fail({code: 1000, message: "has no permissions"});
+            }
+            exec(wina, faila, "Geolocation", "getPermission", []);
         }
         return timeoutTimer;
     },
@@ -162,7 +169,7 @@ var geolocation = {
         // Tell device to get a position ASAP, and also retrieve a reference to the timeout timer generated in getCurrentPosition
         timers[id] = geolocation.getCurrentPosition(successCallback, errorCallback, options);
 
-        var fail = function(e) {
+        var err = function(e) {
             clearTimeout(timers[id].timer);
             var err = new PositionError(e.code, e.message);
             if (errorCallback) {
@@ -170,7 +177,7 @@ var geolocation = {
             }
         };
 
-        var win = function(p) {
+        var succ = function(p) {
             clearTimeout(timers[id].timer);
             if (options.timeout !== Infinity) {
                 timers[id].timer = createTimeout(fail, options.timeout);
@@ -191,7 +198,15 @@ var geolocation = {
             successCallback(pos);
         };
 
-        exec(win, fail, "Geolocation", "addWatch", [id, options.distanceFilter]);
+        var win = function(){
+        	exec(succ, err, "Geolocation", "addWatch", [id, options.distanceFilter]);
+        }
+        var fail = function (){
+        	err({code:1000, message:"Has no permissions"});
+        }
+
+        
+        exec(win, fail, "Geolocation", "getPermission", []);
 
         return id;
     },

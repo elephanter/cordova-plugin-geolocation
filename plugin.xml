@@ -47,8 +47,8 @@ under the License.
       <clobbers target="Position" />
     </js-module>
 
-    <js-module src="www/geolocation.js" name="geolocation">
-      <clobbers target="navigator.geolocation" />
+    <js-module src="www/android/geolocation.js" name="geolocation">
+        <clobbers target="navigator.geolocation" />
     </js-module>
 
     <config-file target="AndroidManifest.xml" parent="/*">
